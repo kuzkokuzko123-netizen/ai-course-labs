@@ -1,0 +1,137 @@
+{
+  "name": "Контроль качества металлических бутылок",
+  "description": "Автоматическая классификация дефектов бутылок на конвейере с использованием AI",
+  "author": "Мыльников Александр Русланович",
+  "diploma_topic": "Разработка системы неразрушающего контроля для выявления дефектов металлических бутылок на конвейерной линии",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bottle-inspection",
+        "responseMode": "lastNode"
+      },
+      "name": "Inspection Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "modelUri",
+              "value": "gpt://{{ $env.YANDEX_FOLDER_ID }}/yandexGPT/latest"
+            },
+            {
+              "name": "completionOptions.temperature",
+              "value": "0.2"
+            },
+            {
+              "name": "completionOptions.maxTokens",
+              "value": "150"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\":\"system\",\"text\":\"Ты эксперт по неразрушающему контролю металлических бутылок. На основе предоставленных измерений (диаметр, высота, толщина стенок, амплитуда вихретокового сигнала, наличие аномалий) классифицируй изделие как: Годен, Брак_трещина, Брак_вмятина, Брак_утонение. Ответь в формате JSON: {\\\"verdict\\\": \\\"<категория>\\\", \\\"confidence\\\": <число от 0 до 1>, \\\"reason\\\": \\\"<краткое обоснование>\\\"}\"},{\"role\":\"user\",\"text\":\"{{ $json.body.measurements }}\"}]"
+            }
+          ]
+        }
+      },
+      "name": "YandexGPT Defect Classifier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "{{ JSON.parse($json.result.alternatives[0].message.text).verdict }}",
+              "operation": "notEquals",
+              "value2": "Годен"
+            }
+          ]
+        }
+      },
+      "name": "IF Defect",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "{{ $env.TELEGRAM_CHAT_ID }}"
+            },
+            {
+              "name": "text",
+              "value": "⚠️ Обнаружен брак бутылки!\nКатегория: {{ JSON.parse($json.result.alternatives[0].message.text).verdict }}\nПричина: {{ JSON.parse($json.result.alternatives[0].message.text).reason }}\nВремя: {{ $json.body.timestamp }}\nДанные: {{ $json.body.measurements }}"
+            }
+          ]
+        }
+      },
+      "name": "Alert Master",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        850,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Inspection Webhook": {
+      "main": [
+        [
+          {
+            "node": "YandexGPT Defect Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YandexGPT Defect Classifier": {
+      "main": [
+        [
+          {
+            "node": "IF Defect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Defect": {
+      "main": [
+        [
+          {
+            "node": "Alert Master",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

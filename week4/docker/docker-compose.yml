@@ -1,0 +1,78 @@
+# docker-compose.yml
+# Конфигурация n8n + PostgreSQL для лабораторной работы №4
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n_workflow          # Имя оставляем как у вас
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Основные настройки n8n
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Moscow}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+
+      # === Подключение к PostgreSQL (ОБЯЗАТЕЛЬНО) ===
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+
+      # Учетные данные Yandex GPT
+      - YANDEX_IAM_TOKEN=${YANDEX_IAM_TOKEN}
+      - YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID}
+
+      # Telegram (опционально, можно оставить пустыми)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+
+      # Секретный ключ webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/home/node/workflows
+    networks:
+      - n8n_network
+    dns:
+      - "8.8.8.8"
+      - "1.1.1.1"
+
+    depends_on:
+      postgres:
+        condition: service_healthy          # Ждать, пока Postgres не просигналит о готовности
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: n8n_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - n8n_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  n8n_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  n8n_network:
+    driver: bridge
