@@ -1,0 +1,22 @@
+# requirements.txt
+# Зависимости для лабораторной работы №6
+# Версии зафиксированы для воспроизводимости
+# Neural Components
+langchain>=0.1.0,<0.2.0
+langchain-community>=0.0.10,<0.1.0
+torch>=2.0.0,<3.0.0
+transformers>=4.35.0,<5.0.0
+# Symbolic Components
+pydantic>=2.0.0,<3.0.0
+pyparsing>=3.1.0,<4.0.0
+# Utilities
+python-dotenv>=1.0.0,<2.0.0
+requests>=2.31.0,<3.0.0
+numpy>=1.24.0,<2.0.0
+# Development
+jupyterlab>=4.0.0,<5.0.0
+pytest>=7.0.0,<8.0.0
+black>=23.0.0
+flake8>=6.0.0
+# Yandex Cloud
+yandexcloud>=0.240.0
